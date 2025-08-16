@@ -8,6 +8,8 @@ import mysql from 'mysql2/promise';
 import { start } from 'repl';
 dotenv.config(); // Load environment variables from .env file
 
+import bcrypt from 'bcrypt';
+
 const app = express();
 const port = 3000;
 app.use(express.json());
@@ -38,6 +40,28 @@ let db: mysql.Connection;
 app.get('/', (req: Request, res: Response) => {
     res.send('Hello from TypeScript Express!');
 });
+
+
+
+app.post('/auth/signup', async (req: Request, res: Response) => {
+    const email = req.body.email;
+    const password = req.body.password;
+
+    const hash = bcrypt.hashSync(password, 10); // Hash the password with bcrypt
+
+    const sql = 'INSERT INTO admin_user (email, hashed_password) VALUES (?, ?)';
+
+    try {
+        await db.query(sql, [email, hash]);
+    } catch(err: any) {
+        console.error("Error inserting user:", err.message);
+        return res.status(500).json({ error: 'Database error' });
+    }
+
+    res.send('User signed up successfully');
+});
+
+
 
 
 app.post('/media/:id/view', (req: Request, res: Response) => {
