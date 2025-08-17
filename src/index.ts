@@ -2,13 +2,14 @@
 import express from 'express';
 import type { Request, Response } from 'express';
 import "reflect-metadata";
+import bcrypt from 'bcrypt';
 
 import dotenv from 'dotenv';
 import mysql from 'mysql2/promise';
-import { start } from 'repl';
+import jwt from 'jsonwebtoken';
 dotenv.config(); // Load environment variables from .env file
 
-import bcrypt from 'bcrypt';
+
 
 const app = express();
 const port = 3000;
@@ -47,6 +48,10 @@ app.post('/auth/signup', async (req: Request, res: Response) => {
     const email = req.body.email;
     const password = req.body.password;
 
+    if (!email || !password) {
+        return res.status(400).json({ error: 'Email and password are required' });
+    }
+
     const hash = bcrypt.hashSync(password, 10); // Hash the password with bcrypt
 
     const sql = 'INSERT INTO admin_user (email, hashed_password) VALUES (?, ?)';
@@ -61,6 +66,31 @@ app.post('/auth/signup', async (req: Request, res: Response) => {
     res.send('User signed up successfully');
 });
 
+
+app.post('/auth/login', async (req: Request, res: Response) => {
+    const email = req.body.email;
+    const password = req.body.password;
+
+    if (!email || !password) {
+        return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    const sql = 'SELECT hashed_password,id FROM admin_user WHERE email = ?';
+
+    // compare hashed with normal
+    const result: any = await db.query(sql, [email]); // get the stored hashed for the associated email
+    if (result[0].length === 0) {
+        return res.status(404).json({ error: 'User does not exist' });
+    }
+
+    if (!bcrypt.compareSync(password, result[0][0].hashed_password)) {
+        return res.status(401).json({ error: 'Invalid password' });
+    }
+
+    // user verified, login process will start here
+    const token = jwt.sign({ email, userId : result[0][0].id }, process.env.JWT_SECRET as any);
+    return res.json({ token, userId: result[0][0].id });
+});
 
 
 
@@ -96,7 +126,7 @@ app.get('/media/:id/analytics', async (req: Request, res: Response) => {
     if (!mediaId) {
         return res.status(400).json({ error: 'Media ID is required' });
     }
-    console.log(startDate, endDate, mediaId);
+
     const totalViewsQuery = 'SELECT COUNT(*) AS total_views FROM media_view_log WHERE media_id = ?';
     const unique_ipsQuery = 'SELECT COUNT(DISTINCT viewed_by_ip) AS unique_ips FROM media_view_log WHERE media_id = ?';
     const viewsPerDayQuery = `
@@ -111,10 +141,6 @@ app.get('/media/:id/analytics', async (req: Request, res: Response) => {
     const viewsPerDay = db.query(viewsPerDayQuery, [startDate, endDate]);
 
     const [totalViewsResult, uniqueIpsResult, viewsPerDayResult] = await Promise.all([totalViews, unique_ips, viewsPerDay]);
-
-    console.log(totalViewsResult);
-    console.log(uniqueIpsResult);
-    console.log(viewsPerDayResult);
 
     if (!totalViewsResult || !uniqueIpsResult || !viewsPerDayResult) {
         return res.status(500).json({ error: 'Failed to fetch analytics data' });
