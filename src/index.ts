@@ -7,6 +7,7 @@ import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 import mysql from 'mysql2/promise';
 import jwt from 'jsonwebtoken';
+import { authMiddleware } from './middleware.js';
 dotenv.config(); // Load environment variables from .env file
 
 
@@ -94,7 +95,7 @@ app.post('/auth/login', async (req: Request, res: Response) => {
 
 
 
-app.post('/media/:id/view', (req: Request, res: Response) => {
+app.post('/media/:id/view', async (req: Request, res: Response) => {
     const IP = req.body.IP; // will be sent through the request body
     const mediaId = req.params.id; // will be sent through the URL parameter or the frontend or postman
     if (!IP || !mediaId) {
@@ -103,16 +104,13 @@ app.post('/media/:id/view', (req: Request, res: Response) => {
 
     const sql = 'INSERT INTO media_view_log (media_id,viewed_by_ip) values (?,?)';
 
-    (async () => {
-        try {
-            await db.query(sql, [mediaId, IP]);
-            console.log(`Media ID ${mediaId} viewed by IP ${IP}`);
-            res.status(200).json({ message: 'View logged successfully' });
-        } catch (err: any) {
-            console.error("Error inserting view log:", err.message);
-            res.status(500).json({ error: 'Database error' });
-        }
-    })();
+    try {
+        await db.query(sql, [mediaId, IP]);
+        res.status(200).json({ message: 'View logged successfully' });
+    } catch (err: any) {
+        console.error("Error inserting view log:", err.message);
+        res.status(500).json({ error: 'Database error' });
+    }
 });
 
 
