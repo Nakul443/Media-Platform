@@ -162,3 +162,27 @@ app.get('/media/:id/analytics', async (req: Request, res: Response) => {
 
     res.send(response);
 });
+
+app.post('/media', authMiddleware, async (req: Request, res: Response) => {
+    const title = req.body.title;
+    const type = req.body.type;
+    const url = req.body.url;
+
+    if (!title || !type || !url) {
+        return res.status(400).json({ error: 'Title, type, and URL are required' });
+    }
+    if (title.length > 150) {
+        return res.status(400).json({ error: 'Title must be less than 150 characters' });
+    }
+    if (type !== 'audio' && type !== 'video') {
+        return res.status(400).json({ error: 'Type must be either "audio" or "video"' });
+    }
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        return res.status(400).json({ error: 'URL must start with http:// or https://' });
+    }
+
+    const sql = 'INSERT INTO media_asset (title, type, file_url) VALUES (?,?,?)';
+
+    await db.query(sql, [title,type,url]);
+    res.status(201).json({ message: 'Media asset created successfully' });
+});
