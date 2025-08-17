@@ -186,3 +186,25 @@ app.post('/media', authMiddleware, async (req: Request, res: Response) => {
     await db.query(sql, [title,type,url]);
     res.status(201).json({ message: 'Media asset created successfully' });
 });
+
+app.get('/media/:id/stream-url', authMiddleware, async (req: Request, res: Response) => {
+
+    const mediaId = req.params.id;
+    if (!mediaId) {
+        return res.status(400).json({ error: 'Media ID is required' });
+    }
+
+    const sql = 'SELECT file_url FROM media_asset WHERE id = ?';
+    const [rows] = await db.query(sql, [mediaId]);
+
+    if ((rows as any[]).length === 0) {
+        return res.status(404).json({ error: 'Media not found' });
+    }
+
+    const fileUrl = (rows as any[])[0].file_url;
+    res.json({ streamUrl: fileUrl });
+});
+
+
+// token : eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImFiY2QyQGdtYWlsLmNvbSIsInVzZXJJZCI6MywiaWF0IjoxNzU1NDQ5ODUwfQ.3IbpM6EvJzfN-eKeP1xZ49qJuOAlHnefumVIGNGnDU8
+// for future use
