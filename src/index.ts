@@ -8,6 +8,8 @@ import dotenv from 'dotenv';
 import mysql from 'mysql2/promise';
 import jwt from 'jsonwebtoken';
 import { authMiddleware } from './middleware.js';
+import type { RedisClientType } from '@redis/client';
+import { createClient } from '@redis/client';
 dotenv.config(); // Load environment variables from .env file
 
 
@@ -17,6 +19,7 @@ const port = 3000;
 app.use(express.json());
 
 let db: mysql.Connection;
+let redisClient: RedisClientType<any, any, any>;
 
 (async () => {
     try {
@@ -28,6 +31,11 @@ let db: mysql.Connection;
         });
         console.log("✅ Connected to MySQL database");
 
+        redisClient = await createClient()
+        .on("error", (err) => console.log("Redis Client Error", err))
+        .connect();
+
+        console.log("✅ Connected to Redis database");
         // start the server only after successful DB connection
         app.listen(port, () => {
             console.log(`Server is running at http://localhost:${port}`);
@@ -125,6 +133,11 @@ app.get('/media/:id/analytics', async (req: Request, res: Response) => {
         return res.status(400).json({ error: 'Media ID is required' });
     }
 
+    const exists = await redisClient.get(`media:${mediaId}:analytics`);
+    if (exists) {
+        return res.json(JSON.parse(exists));
+    }
+
     const totalViewsQuery = 'SELECT COUNT(*) AS total_views FROM media_view_log WHERE media_id = ?';
     const unique_ipsQuery = 'SELECT COUNT(DISTINCT viewed_by_ip) AS unique_ips FROM media_view_log WHERE media_id = ?';
     const viewsPerDayQuery = `
@@ -159,6 +172,8 @@ app.get('/media/:id/analytics', async (req: Request, res: Response) => {
         uniqueIps: (uniqueIpsResult as any[])[0][0].unique_ips,
         viewsPerDay: viewObject
     };
+
+    await redisClient.setEx(`media:${mediaId}:analytics`, 60, JSON.stringify(response)); // redis only stores json
 
     res.send(response);
 });

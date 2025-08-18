@@ -23,6 +23,7 @@
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "mysql2": "^3.14.3",
+    "redis": "^4.7.1",
     "reflect-metadata": "^0.2.2",
     "tsc": "^2.0.4",
     "typeorm": "^0.3.25"
