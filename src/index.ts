@@ -7,9 +7,10 @@ import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 import mysql from 'mysql2/promise';
 import jwt from 'jsonwebtoken';
-import { authMiddleware } from './middleware.js';
+import { authMiddleware } from './middlewares/authMiddleware.js';
 import type { RedisClientType } from '@redis/client';
 import { createClient } from '@redis/client';
+import { rateLimitMiddleware } from './middlewares/rateLimitMiddleware.js';
 dotenv.config(); // Load environment variables from .env file
 
 
@@ -19,7 +20,7 @@ const port = 3000;
 app.use(express.json());
 
 let db: mysql.Connection;
-let redisClient: RedisClientType<any, any, any>;
+export let redisClient: RedisClientType<any, any, any>;
 
 (async () => {
     try {
@@ -101,9 +102,8 @@ app.post('/auth/login', async (req: Request, res: Response) => {
     return res.json({ token, userId: result[0][0].id });
 });
 
-
-
-app.post('/media/:id/view', async (req: Request, res: Response) => {
+app.post('/media/:id/view', rateLimitMiddleware, async (req: Request, res: Response) => {
+    console.log("Logging view for media ID:", req.params.id);
     const IP = req.body.IP; // will be sent through the request body
     const mediaId = req.params.id; // will be sent through the URL parameter or the frontend or postman
     if (!IP || !mediaId) {
@@ -173,7 +173,7 @@ app.get('/media/:id/analytics', async (req: Request, res: Response) => {
         viewsPerDay: viewObject
     };
 
-    await redisClient.setEx(`media:${mediaId}:analytics`, 60, JSON.stringify(response)); // redis only stores json
+    await redisClient.setEx(`media:${mediaId}:analytics`, 60, JSON.stringify(response)); // redis only stores strings
 
     res.send(response);
 });
