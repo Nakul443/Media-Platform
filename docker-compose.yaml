@@ -1,0 +1,31 @@
+services:
+  db:
+    image: mysql:latest
+    restart: always
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "3306:3306"
+
+  # server:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   environment:
+  #     DB_HOST: db
+  #     DB_USER: root
+  #     DB_PASSWORD: root
+  #     DB_NAME: media_platform
+  #   env_file:
+  #     - .env
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - db
+  #     - redis
+  
+  redis:
+    image: redis
+    restart: always
+    ports:
+      - "6379:6379"
