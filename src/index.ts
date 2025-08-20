@@ -11,6 +11,8 @@ import { authMiddleware } from './middlewares/authMiddleware.js';
 import type { RedisClientType } from '@redis/client';
 import { createClient } from '@redis/client';
 import { rateLimitMiddleware } from './middlewares/rateLimitMiddleware.js';
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import fs from 'fs';
 dotenv.config(); // Load environment variables from .env file
 
 
@@ -18,6 +20,14 @@ dotenv.config(); // Load environment variables from .env file
 const app = express();
 const port = 3000;
 app.use(express.json());
+
+const s3Client = new S3Client({
+    region: process.env.AWS_REGION ?? 'ap-south-1', // Default to us-east-1 if not set
+    credentials: {
+        accessKeyId: process.env.S3_ACCESS_KEY ?? '',
+        secretAccessKey: process.env.S3_SECRET_KEY ?? ''
+    }
+});
 
 let db: mysql.Connection;
 export let redisClient: RedisClientType<any, any, any>;
@@ -181,10 +191,9 @@ app.get('/media/:id/analytics', async (req: Request, res: Response) => {
 app.post('/media', authMiddleware, async (req: Request, res: Response) => {
     const title = req.body.title;
     const type = req.body.type;
-    const url = req.body.url;
 
-    if (!title || !type || !url) {
-        return res.status(400).json({ error: 'Title, type, and URL are required' });
+    if (!title || !type) {
+        return res.status(400).json({ error: 'Title, type are required' });
     }
     if (title.length > 150) {
         return res.status(400).json({ error: 'Title must be less than 150 characters' });
@@ -192,13 +201,25 @@ app.post('/media', authMiddleware, async (req: Request, res: Response) => {
     if (type !== 'audio' && type !== 'video') {
         return res.status(400).json({ error: 'Type must be either "audio" or "video"' });
     }
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        return res.status(400).json({ error: 'URL must start with http:// or https://' });
-    }
+
+    const fileBuffer = fs.readFileSync('./test.mp4');
+
+    // Put an object into an Amazon S3 bucket.
+    const bucketName = process.env.S3_BUCKET_NAME ?? '';
+    const uploadResult = await s3Client.send(
+        new PutObjectCommand({
+        Bucket: bucketName,
+        Key: "videos/video.mp4",
+        Body: fileBuffer,
+        ContentType: 'video/mp4',
+        }),
+    );
+
+    const fileUrl = "s3://" + bucketName + "/video.mp4"; // Construct the file URL
 
     const sql = 'INSERT INTO media_asset (title, type, file_url) VALUES (?,?,?)';
 
-    await db.query(sql, [title,type,url]);
+    await db.query(sql, [title,type, fileUrl]);
     res.status(201).json({ message: 'Media asset created successfully' });
 });
 
